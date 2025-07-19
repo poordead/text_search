@@ -29,11 +29,16 @@ QVariant FoundFilesModel::data(const QModelIndex &index, int role) const
 	if (role == Qt::DisplayRole || role == Qt::EditRole) {
 		switch (index.column()) {
 		case C_Filename:
-			return m_data.at(index.row()).fileName;
+			return std::get<FileInfo>(m_data.at(index.row())).fileName;
 		case C_FileSize:
-			return m_data.at(index.row()).fileSize;
+			return std::get<FileInfo>(m_data.at(index.row())).fileSize;
 		case C_Timestamp:
-			return m_data.at(index.row()).lastModified;
+			return std::get<FileInfo>(m_data.at(index.row())).lastModified;
+		}
+	} else if (role == Qt::CheckStateRole) {
+		switch (index.column()) {
+		case C_Filename:
+			return std::get<Qt::CheckState>(m_data.at(index.row()));
 		}
 	}
 	return QVariant();
@@ -54,7 +59,7 @@ void FoundFilesModel::setFileInfo(int row, const FileInfo &fi)
 {
 	if (m_data.count() <= row)
 		return;
-	m_data[row] = fi;
+	m_data[row] = std::make_tuple(Qt::Unchecked, fi);
 	emit dataChanged(index(row, 0), index(row, C_Timestamp));
 }
 
@@ -70,5 +75,25 @@ QVariant FoundFilesModel::headerData(int section, Qt::Orientation orientation, i
 			return tr("Последнее изменение");
 		}
 	}
-	return QVariant();
+	return QAbstractItemModel::headerData(section, orientation, role);
+}
+
+Qt::ItemFlags FoundFilesModel::flags(const QModelIndex &index) const
+{
+	auto ret{QAbstractItemModel::flags(index)};
+	if (index.column() == C_Filename)
+		ret |= Qt::ItemIsUserCheckable;
+
+	return ret;
+}
+
+bool FoundFilesModel::setData(const QModelIndex &index, const QVariant &value, int role)
+{
+	if (role == Qt::CheckStateRole && index.column() == C_Filename) {
+		std::get<Qt::CheckState>(m_data[index.row()]) = value.value<Qt::CheckState>();
+		emit dataChanged(index, index);
+		return true;
+	}
+
+	return QAbstractItemModel::setData(index, value, role);
 }

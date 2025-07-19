@@ -1,8 +1,13 @@
 #pragma once
 
-#include <QtCore/qpromise.h>
+#include <QPromise>
 #include "fileinfo.h"
 
 void findTextInZip(QPromise<FileInfo> &promise,
 				   const QString &zipPath,
 				   const std::string &search_str);
+
+void zipSelectedFiles(QPromise<void> &promise,
+					  const QString &zipPath,
+					  const QString &newZipPath,
+					  const std::vector<std::string> &files);

@@ -11,6 +11,7 @@ class MainWindow;
 
 class QTreeWidgetItem;
 class QProgressBar;
+class QPushButton;
 class FoundFilesModel;
 
 class MainWindow : public QWidget
@@ -23,9 +24,15 @@ private:
 	std::unique_ptr<Ui::MainWindow> ui;
 	QTreeWidgetItem *m_currentFileItem{nullptr};
 	QFutureWatcher<FileInfo> m_watcher;
+	QFutureWatcher<void> m_saveWatcher;
 	QProgressBar *m_progressBar{nullptr};
+	QProgressBar *m_saveProgressBar{nullptr};
+	QPushButton *m_saveButton{nullptr};
 	FoundFilesModel *m_foundFiles{nullptr};
+	const QString m_fileName;
 
-protected:
+private:
 	void closeEvent(QCloseEvent *event) override;
+
+	void saveZip();
 };

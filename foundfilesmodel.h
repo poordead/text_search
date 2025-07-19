@@ -3,7 +3,6 @@
 #include "fileinfo.h"
 
 #include <QAbstractItemModel>
-#include <QFileInfo>
 #include <QList>
 
 class FoundFilesModel : public QAbstractItemModel
@@ -19,8 +18,10 @@ public:
 	bool insertRows(int row, int count, const QModelIndex &parent) override;
 	void setFileInfo(int row, const FileInfo &fi);
 	QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
+	Qt::ItemFlags flags(const QModelIndex &index) const override;
+	bool setData(const QModelIndex &index, const QVariant &value, int role) override;
 
 private:
 	QModelIndex parent(const QModelIndex &child) const override;
-	QList<FileInfo> m_data;
+	QList<std::tuple<Qt::CheckState, FileInfo>> m_data;
 };

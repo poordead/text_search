@@ -10,7 +10,6 @@ int main(int argc, char *argv[])
 
 	QCommandLineParser parser;
 	parser.addPositionalArgument("source", QCoreApplication::translate("main", "Исходный файл."));
-
 	parser.process(a);
 
 	QString fileName;
