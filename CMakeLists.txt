@@ -14,6 +14,8 @@ qt_add_executable(text_search
     progressstatus.h progressstatus.cpp progressstatus.ui
     foundfilesmodel.h foundfilesmodel.cpp
     fileinfo.h
+    filesview.h filesview.cpp
+    minizip_wrapper.h minizip_wrapper.cpp
 )
 
 target_link_libraries(text_search
@@ -27,7 +29,7 @@ include(GNUInstallDirs)
 add_subdirectory(zlib-develop)
 add_subdirectory(zlib-develop/contrib/minizip)
 
-target_include_directories(text_search PRIVATE zlib-develop/contrib)
+target_include_directories(text_search PRIVATE zlib-develop/contrib .)
 target_link_libraries(text_search PRIVATE libminizipstatic)
 
 install(TARGETS text_search

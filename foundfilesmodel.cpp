@@ -31,9 +31,7 @@ QVariant FoundFilesModel::data(const QModelIndex &index, int role) const
 		case C_Filename:
 			return m_data.at(index.row()).fileName;
 		case C_FileSize:
-			return role == Qt::EditRole
-					   ? QVariant{m_data.at(index.row()).fileSize}
-					   : QVariant{QLocale().formattedDataSize(m_data.at(index.row()).fileSize)};
+			return m_data.at(index.row()).fileSize;
 		case C_Timestamp:
 			return m_data.at(index.row()).lastModified;
 		}

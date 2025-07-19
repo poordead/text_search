@@ -25,7 +25,6 @@ private:
 	QFutureWatcher<FileInfo> m_watcher;
 	QProgressBar *m_progressBar{nullptr};
 	FoundFilesModel *m_foundFiles{nullptr};
-	// void extractZip(QPromise<void> &promise, const QString &zipPath, const char *extractPath);
 
 protected:
 	void closeEvent(QCloseEvent *event) override;
