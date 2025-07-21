@@ -1,12 +1,15 @@
 #include "mainwindow.h"
 #include "foundfilesmodel.h"
 #include "minizip_wrapper.h"
+#include "progresswithcancel.h"
 #include "ui_mainwindow.h"
 
 #include <QFileDialog>
 #include <QFutureWatcher>
+#include <QMessageBox>
 #include <QProgressBar>
 #include <QPushButton>
+#include <QStandardPaths>
 #include <QtConcurrent/QtConcurrentRun>
 
 MainWindow::MainWindow(const QString &fileName, QWidget *parent)
@@ -22,17 +25,19 @@ MainWindow::MainWindow(const QString &fileName, QWidget *parent)
 	analyzeItem->setExpanded(true);
 
 	auto progressItem = new QTreeWidgetItem(analyzeItem);
-	ui->summary_treeWidget->setItemWidget(progressItem, 0, m_progressBar = new QProgressBar);
+	ui->summary_treeWidget->setItemWidget(progressItem, 0, m_progressBar = new ProgressWithCancel);
+	progressItem->setHidden(true);
 
 	QTreeWidgetItem *saveItem = new QTreeWidgetItem(ui->summary_treeWidget, {tr("Сохранение")});
 	auto saveBtnItem = new QTreeWidgetItem(saveItem);
-	ui->summary_treeWidget
-		->setItemWidget(saveBtnItem,
-						0,
-						m_saveButton = new QPushButton{"Coхранить", ui->summary_treeWidget});
+	m_saveButton = new QPushButton{"Coхранить"};
+	m_saveButton->setFixedWidth(m_saveButton->sizeHint().width());
+	ui->summary_treeWidget->setItemWidget(saveBtnItem, 0, m_saveButton);
+	m_currentSaveFileItem = new QTreeWidgetItem(saveItem);
 	auto saveProgressItem = new QTreeWidgetItem(saveItem);
 	ui->summary_treeWidget
-		->setItemWidget(saveProgressItem, 0, m_saveProgressBar = new QProgressBar);
+		->setItemWidget(saveProgressItem, 0, m_saveProgressBar = new ProgressWithCancel);
+	saveProgressItem->setHidden(true);
 
 	ui->foundFiles->setModel(m_foundFiles = new FoundFilesModel{this});
 	ui->foundFiles->setFileName(fileName);
@@ -40,14 +45,24 @@ MainWindow::MainWindow(const QString &fileName, QWidget *parent)
 	connect(&m_watcher,
 			&QFutureWatcherBase::progressValueChanged,
 			m_progressBar,
-			&QProgressBar::setValue);
+			&ProgressWithCancel::setValue);
 	connect(&m_watcher,
 			&QFutureWatcherBase::progressRangeChanged,
 			m_progressBar,
-			&QProgressBar::setRange);
+			&ProgressWithCancel::setRange);
 	connect(&m_watcher, &QFutureWatcherBase::progressTextChanged, this, [this](const QString &text) {
 		m_currentFileItem->setText(0, text);
 	});
+	connect(&m_watcher, &QFutureWatcherBase::started, this, [progressItem]() {
+		progressItem->setHidden(false);
+	});
+	connect(&m_watcher, &QFutureWatcherBase::finished, this, [progressItem]() {
+		progressItem->setHidden(true);
+	});
+	connect(&m_watcher, &QFutureWatcherBase::canceled, this, [progressItem]() {
+		progressItem->setHidden(true);
+	});
+	connect(m_progressBar, &ProgressWithCancel::canceled, &m_watcher, &QFutureWatcherBase::cancel);
 
 	connect(&m_watcher, &QFutureWatcherBase::resultReadyAt, this, [this](int resultIndex) {
 		if (m_foundFiles->rowCount() < resultIndex + 1) {
@@ -59,13 +74,31 @@ MainWindow::MainWindow(const QString &fileName, QWidget *parent)
 	connect(&m_saveWatcher,
 			&QFutureWatcherBase::progressValueChanged,
 			m_saveProgressBar,
-			&QProgressBar::setValue);
+			&ProgressWithCancel::setValue);
 	connect(&m_saveWatcher,
 			&QFutureWatcherBase::progressRangeChanged,
 			m_saveProgressBar,
-			&QProgressBar::setRange);
+			&ProgressWithCancel::setRange);
+	connect(&m_saveWatcher,
+			&QFutureWatcherBase::progressTextChanged,
+			this,
+			[this](const QString &text) { m_currentSaveFileItem->setText(0, text); });
+	connect(&m_saveWatcher, &QFutureWatcherBase::started, this, [saveProgressItem]() {
+		saveProgressItem->setHidden(false);
+	});
+	connect(&m_saveWatcher, &QFutureWatcherBase::finished, this, [saveProgressItem]() {
+		saveProgressItem->setHidden(true);
+	});
+	connect(&m_saveWatcher, &QFutureWatcherBase::canceled, this, [saveProgressItem]() {
+		saveProgressItem->setHidden(true);
+	});
+	connect(m_saveProgressBar,
+			&ProgressWithCancel::canceled,
+			&m_saveWatcher,
+			&QFutureWatcherBase::cancel);
 
 	connect(m_saveButton, &QPushButton::clicked, this, &MainWindow::saveZip);
+	connect(ui->selectAll_btn, &QAbstractButton::clicked, this, &MainWindow::selectAll);
 
 	m_watcher.setFuture(QtConcurrent::run(findTextInZip, fileName, "secret"));
 }
@@ -77,17 +110,13 @@ MainWindow::~MainWindow()
 void MainWindow::closeEvent(QCloseEvent *event)
 {
 	m_watcher.cancel();
+	m_saveWatcher.cancel();
+	m_watcher.waitForFinished();
+	m_saveWatcher.waitForFinished();
 }
 
 void MainWindow::saveZip()
 {
-	QString fileName{QFileDialog::getSaveFileName(this,
-												  tr("Сохранить выбранные файлы в архив"),
-												  QString(),
-												  tr("Архив (*.zip)"))};
-	if (fileName.isEmpty())
-		return;
-
 	std::vector<std::string> files;
 
 	for (int i = 0, size = m_foundFiles->rowCount(); i < size; ++i) {
@@ -99,5 +128,27 @@ void MainWindow::saveZip()
 			files.emplace_back(fileName.toUtf8());
 		}
 	}
+	if (files.empty()) {
+		QMessageBox::warning(this, windowTitle(), tr("Необходимо выбрать файлы на вкладке Файлы"));
+		return;
+	}
+
+	const QString fileName{QFileDialog::getSaveFileName(this,
+														tr("Сохранить выбранные файлы в архив"),
+														QStandardPaths::writableLocation(
+															QStandardPaths::DocumentsLocation),
+														tr("Архив (*.zip)"))};
+	if (fileName.isEmpty())
+		return;
+
 	m_saveWatcher.setFuture(QtConcurrent::run(zipSelectedFiles, m_fileName, fileName, files));
+}
+
+void MainWindow::selectAll()
+{
+	for (int i = 0, size = m_foundFiles->rowCount(); i < size; ++i) {
+		m_foundFiles->setData(m_foundFiles->index(i, FoundFilesModel::C_Filename),
+							  Qt::Checked,
+							  Qt::CheckStateRole);
+	}
 }

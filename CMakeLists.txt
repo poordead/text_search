@@ -16,6 +16,7 @@ qt_add_executable(text_search
     fileinfo.h
     filesview.h filesview.cpp
     minizip_wrapper.h minizip_wrapper.cpp
+    progresswithcancel.h progresswithcancel.cpp progressbar.ui
 )
 
 target_link_libraries(text_search
