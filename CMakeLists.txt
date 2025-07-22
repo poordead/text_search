@@ -18,7 +18,6 @@ qt_add_executable(text_search
     minizip_wrapper.h minizip_wrapper.cpp
     progresswithcancel.h progresswithcancel.cpp progressbar.ui
     conanfile.txt
-    readme
 )
 
 target_link_libraries(text_search
