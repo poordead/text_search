@@ -33,24 +33,7 @@ find_package(minizip REQUIRED)
 
 target_link_libraries(text_search PRIVATE minizip::minizip)
 
-if(APPLE)
-    add_subdirectory(zlib-develop)
-    add_subdirectory(zlib-develop/contrib/minizip)
-
-    target_link_libraries(text_search PRIVATE libminizipstatic)
-
-elseif(LINUX)
-	find_package(PkgConfig REQUIRED)
-	pkg_check_modules(MINIZIP REQUIRED minizip)
-
-	include_directories(${MINIZIP_INCLUDE_DIRS})
-
-	target_link_libraries(text_search PRIVATE ${MINIZIP_LIBRARIES})
-endif()
-
-if(NOT WIN32)
-    target_include_directories(text_search PRIVATE zlib-develop/contrib .)
-endif()
+target_include_directories(text_search PRIVATE .)
 
 install(TARGETS text_search
     BUNDLE  DESTINATION .
