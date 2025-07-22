@@ -9,20 +9,14 @@ void findTextInZip(QPromise<FileInfo> &promise,
 				   const QString &zipPath,
 				   const std::string &search_str)
 {
-	unzFile zipfile = unzOpen64(
-#ifdef Q_OS_WINDOWS
-		reinterpret_cast<const wchar_t *>(zipPath.utf16())
-#else
-		zipPath.toUtf8()
-#endif
-	);
-	if (!zipfile) {
-		promise.setException(std::make_exception_ptr("Cannot open zip file"));
-		return;
-	}
+    unzFile zipfile = unzOpen64(zipPath.toUtf8());
+    if (!zipfile) {
+        promise.setException(std::make_exception_ptr("Cannot open zip file"));
+        return;
+    }
 
-	unz_global_info global_info;
-	if (unzGetGlobalInfo(zipfile, &global_info) != UNZ_OK) {
+    unz_global_info global_info;
+    if (unzGetGlobalInfo(zipfile, &global_info) != UNZ_OK) {
 		unzClose(zipfile);
 		promise.setException(std::make_exception_ptr("Could not read file info"));
 		return;
@@ -100,11 +94,7 @@ void zipSelectedFiles(QPromise<void> &promise,
 					  const std::vector<std::string> &files)
 {
 	unzFile zipfile = unzOpen64(
-#ifdef Q_OS_WINDOWS
-		reinterpret_cast<const wchar_t *>(zipPath.utf16())
-#else
 		zipPath.toUtf8()
-#endif
 	);
 	if (!zipfile) {
 		promise.setException(std::make_exception_ptr("Cannot open zip file"));
@@ -113,20 +103,13 @@ void zipSelectedFiles(QPromise<void> &promise,
 
 	promise.setProgressRange(0, files.size());
 
-	zipFile zf = zipOpen64(
-#ifdef Q_OS_WINDOWS
-		reinterpret_cast<const wchar_t *>(newZipPath.utf16())
-#else
-		newZipPath.toUtf8()
-#endif
-			,
-		APPEND_STATUS_CREATE);
+    zipFile zf = zipOpen64(newZipPath.toUtf8(), APPEND_STATUS_CREATE);
 
-	if (!zf) {
-		promise.setException(std::make_exception_ptr("Error creating zip file"));
+    if (!zf) {
+        promise.setException(std::make_exception_ptr("Error creating zip file"));
 		return;
-	}
-	int progressValue{0};
+    }
+    int progressValue{0};
 
 	for (const auto &fileName : files) {
 		promise.suspendIfRequested();
