@@ -27,11 +27,22 @@ target_link_libraries(text_search
 
 include(GNUInstallDirs)
 
-add_subdirectory(zlib-develop)
-add_subdirectory(zlib-develop/contrib/minizip)
+if(APPLE OR WIN32)
+	add_subdirectory(zlib-develop)
+	add_subdirectory(zlib-develop/contrib/minizip)
+
+	target_link_libraries(text_search PRIVATE libminizipstatic)
+
+elseif(LINUX)
+	find_package(PkgConfig REQUIRED)
+	pkg_check_modules(MINIZIP REQUIRED minizip)
+
+	include_directories(${MINIZIP_INCLUDE_DIRS})
+
+	target_link_libraries(text_search PRIVATE ${MINIZIP_LIBRARIES})
+endif()
 
 target_include_directories(text_search PRIVATE zlib-develop/contrib .)
-target_link_libraries(text_search PRIVATE libminizipstatic)
 
 install(TARGETS text_search
     BUNDLE  DESTINATION .
@@ -39,9 +50,11 @@ install(TARGETS text_search
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
-qt_generate_deploy_app_script(
-    TARGET text_search
-    OUTPUT_SCRIPT deploy_script
-    NO_UNSUPPORTED_PLATFORM_ERROR
-)
-install(SCRIPT ${deploy_script})
+if(NOT LINUX)
+	qt_generate_deploy_app_script(
+		TARGET text_search
+		OUTPUT_SCRIPT deploy_script
+		NO_UNSUPPORTED_PLATFORM_ERROR
+	)
+	install(SCRIPT ${deploy_script})
+endif()
