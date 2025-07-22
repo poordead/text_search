@@ -3,4 +3,4 @@
 
 Сборка
 conan install . --output-folder=build --build=missing
-cmake -S . --build build --target all
+cmake -S . -B build --target all
