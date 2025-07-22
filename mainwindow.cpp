@@ -100,7 +100,8 @@ MainWindow::MainWindow(const QString &fileName, QWidget *parent)
 	connect(m_saveButton, &QPushButton::clicked, this, &MainWindow::saveZip);
 	connect(ui->selectAll_btn, &QAbstractButton::clicked, this, &MainWindow::selectAll);
 
-	m_watcher.setFuture(QtConcurrent::run(findTextInZip, fileName, "secret"));
+    if (!fileName.isEmpty())
+        m_watcher.setFuture(QtConcurrent::run(findTextInZip, fileName, "secret"));
 }
 
 MainWindow::~MainWindow()

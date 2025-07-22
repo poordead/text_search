@@ -17,6 +17,8 @@ qt_add_executable(text_search
     filesview.h filesview.cpp
     minizip_wrapper.h minizip_wrapper.cpp
     progresswithcancel.h progresswithcancel.cpp progressbar.ui
+    conanfile.txt
+    readme
 )
 
 target_link_libraries(text_search
@@ -27,11 +29,15 @@ target_link_libraries(text_search
 
 include(GNUInstallDirs)
 
-if(APPLE OR WIN32)
-	add_subdirectory(zlib-develop)
-	add_subdirectory(zlib-develop/contrib/minizip)
+find_package(minizip REQUIRED)
 
-	target_link_libraries(text_search PRIVATE libminizipstatic)
+target_link_libraries(text_search PRIVATE minizip::minizip)
+
+if(APPLE)
+    add_subdirectory(zlib-develop)
+    add_subdirectory(zlib-develop/contrib/minizip)
+
+    target_link_libraries(text_search PRIVATE libminizipstatic)
 
 elseif(LINUX)
 	find_package(PkgConfig REQUIRED)
@@ -42,7 +48,9 @@ elseif(LINUX)
 	target_link_libraries(text_search PRIVATE ${MINIZIP_LIBRARIES})
 endif()
 
-target_include_directories(text_search PRIVATE zlib-develop/contrib .)
+if(NOT WIN32)
+    target_include_directories(text_search PRIVATE zlib-develop/contrib .)
+endif()
 
 install(TARGETS text_search
     BUNDLE  DESTINATION .

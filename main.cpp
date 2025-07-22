@@ -21,7 +21,9 @@ int main(int argc, char *argv[])
 	} else
 		fileName = args.first();
 
-	MainWindow w(fileName);
+    if (fileName.isEmpty())
+        return 0;
+    MainWindow w(fileName);
 	w.show();
 	return a.exec();
 }
