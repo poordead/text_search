@@ -11,7 +11,7 @@ qt_add_executable(text_search
     mainwindow.cpp
     mainwindow.h
     mainwindow.ui
-    progressstatus.h progressstatus.cpp progressstatus.ui
+
     foundfilesmodel.h foundfilesmodel.cpp
     fileinfo.h
     filesview.h filesview.cpp
