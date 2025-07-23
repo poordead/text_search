@@ -36,5 +36,8 @@ private:
 	void closeEvent(QCloseEvent *event) override;
 
 	void saveZip();
-	void selectAll();
+	void selectAll(bool checked);
+	void filesFoundModelDataChanged(const QModelIndex &topLeft,
+									const QModelIndex &bottomRight,
+									const QList<int> &roles);
 };

@@ -13,15 +13,16 @@ int main(int argc, char *argv[])
 	parser.process(a);
 
 	QString fileName;
-	if (const auto args{parser.positionalArguments()}; args.isEmpty()) {
+	if (const auto args{parser.positionalArguments()};
+		!args.isEmpty() && QFile::exists(args.first())) {
+		fileName = args.first();
+	} else
 		fileName = QFileDialog::getOpenFileName(nullptr,
 												QFileDialog::tr("Исследовать файл"),
 												QString(),
 												QFileDialog::tr("Архив (*.zip)"));
-	} else
-		fileName = args.first();
 
-    if (fileName.isEmpty())
+	if (fileName.isEmpty())
         return 0;
     MainWindow w(fileName);
 	w.show();

@@ -18,8 +18,9 @@ MainWindow::MainWindow(const QString &fileName, QWidget *parent)
 	, m_fileName(fileName)
 {
 	ui->setupUi(this);
+    ui->tabWidget->setCurrentIndex(0);
 
-	QTreeWidgetItem *analyzeItem = new QTreeWidgetItem(ui->summary_treeWidget, {tr("Анализ")});
+    QTreeWidgetItem *analyzeItem = new QTreeWidgetItem(ui->summary_treeWidget, {tr("Анализ")});
 	new QTreeWidgetItem(analyzeItem, {fileName});
 	m_currentFileItem = new QTreeWidgetItem(analyzeItem);
 	analyzeItem->setExpanded(true);
@@ -69,6 +70,7 @@ MainWindow::MainWindow(const QString &fileName, QWidget *parent)
 			m_foundFiles->insertRow(m_foundFiles->rowCount());
 		}
 		m_foundFiles->setFileInfo(resultIndex, m_watcher.resultAt(resultIndex));
+        ui->foundCount->setValue(ui->foundCount->value() + 1);
 	});
 
 	connect(&m_saveWatcher,
@@ -99,6 +101,11 @@ MainWindow::MainWindow(const QString &fileName, QWidget *parent)
 
 	connect(m_saveButton, &QPushButton::clicked, this, &MainWindow::saveZip);
 	connect(ui->selectAll_btn, &QAbstractButton::clicked, this, &MainWindow::selectAll);
+
+    connect(m_foundFiles,
+            &FoundFilesModel::dataChanged,
+            this,
+            &MainWindow::filesFoundModelDataChanged);
 
     if (!fileName.isEmpty())
         m_watcher.setFuture(QtConcurrent::run(findTextInZip, fileName, "secret"));
@@ -145,11 +152,29 @@ void MainWindow::saveZip()
 	m_saveWatcher.setFuture(QtConcurrent::run(zipSelectedFiles, m_fileName, fileName, files));
 }
 
-void MainWindow::selectAll()
+void MainWindow::selectAll(bool checked)
 {
-	for (int i = 0, size = m_foundFiles->rowCount(); i < size; ++i) {
-		m_foundFiles->setData(m_foundFiles->index(i, FoundFilesModel::C_Filename),
-							  Qt::Checked,
-							  Qt::CheckStateRole);
-	}
+    ui->selectAll_btn->setText(checked ? tr("Снять выделение") : tr("Выделить все"));
+    for (int i = 0, size = m_foundFiles->rowCount(); i < size; ++i) {
+        m_foundFiles->setData(m_foundFiles->index(i, FoundFilesModel::C_Filename),
+                              checked ? Qt::Checked : Qt::Unchecked,
+                              Qt::CheckStateRole);
+    }
+}
+
+void MainWindow::filesFoundModelDataChanged(const QModelIndex &topLeft,
+                                            const QModelIndex &bottomRight,
+                                            const QList<int> &roles)
+{
+    if (topLeft.column() == FoundFilesModel::C_Filename && roles.contains(Qt::CheckStateRole)) {
+        for (int row = topLeft.row(); row <= bottomRight.row(); ++row) {
+            if (m_foundFiles->index(row, FoundFilesModel::C_Filename)
+                    .data(Qt::CheckStateRole)
+                    .value<Qt::CheckState>()
+                == Qt::Checked)
+                ui->selectedCount->setValue(ui->selectedCount->value() + 1);
+            else
+                ui->selectedCount->setValue(ui->selectedCount->value() - 1);
+        }
+    }
 }

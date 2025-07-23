@@ -91,7 +91,7 @@ bool FoundFilesModel::setData(const QModelIndex &index, const QVariant &value, i
 {
 	if (role == Qt::CheckStateRole && index.column() == C_Filename) {
 		std::get<Qt::CheckState>(m_data[index.row()]) = value.value<Qt::CheckState>();
-		emit dataChanged(index, index);
+		emit dataChanged(index, index, {role});
 		return true;
 	}
 
