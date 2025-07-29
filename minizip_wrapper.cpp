@@ -96,43 +96,43 @@ class ThreadSafeQueue
 public:
     void push(const T &value)
     {
-        std::unique_lock<std::mutex> lock(mutex_);
-        queue_.push(value);
+        std::unique_lock<std::mutex> lock(m_mutex);
+        m_queue.push(value);
         lock.unlock();
-        cond_.notify_one();
+        m_cond.notify_one();
     }
 
     void complete()
     {
-        std::lock_guard<std::mutex> lock(mutex_);
-        completed_ = true;
-        cond_.notify_all();
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_completed = true;
+        m_cond.notify_all();
     }
 
     std::optional<T> pop()
     {
-        std::unique_lock<std::mutex> lock(mutex_);
-        cond_.wait(lock, [this] { return !queue_.empty() || completed_; });
+        std::unique_lock<std::mutex> lock(m_mutex);
+        m_cond.wait(lock, [this] { return !m_queue.empty() || m_completed; });
 
-        if (queue_.empty() && completed_) {
+        if (m_queue.empty() && m_completed) {
             return std::nullopt;
         }
-        T value = queue_.front();
-        queue_.pop();
+        T value = m_queue.front();
+        m_queue.pop();
         return value;
     }
 
     bool empty() const
     {
-        std::lock_guard<std::mutex> lock(mutex_);
-        return queue_.empty();
+        std::lock_guard<std::mutex> lock(m_mutex);
+        return m_queue.empty();
     }
 
 private:
-    std::queue<T> queue_;
-    bool completed_ = false;
-    mutable std::mutex mutex_;
-    std::condition_variable cond_;
+    std::queue<T> m_queue;
+    bool m_completed = false;
+    mutable std::mutex m_mutex;
+    std::condition_variable m_cond;
 };
 
 void zipSelectedFiles(QPromise<void> &promise,
