@@ -125,16 +125,16 @@ void MainWindow::closeEvent(QCloseEvent *event)
 
 void MainWindow::saveZip()
 {
-	std::vector<std::string> files;
+    QStringList files;
 
-	for (int i = 0, size = m_foundFiles->rowCount(); i < size; ++i) {
+    for (int i = 0, size = m_foundFiles->rowCount(); i < size; ++i) {
 		if (m_foundFiles->index(i, FoundFilesModel::C_Filename)
 				.data(Qt::CheckStateRole)
 				.value<Qt::CheckState>()
 			== Qt::Checked) {
 			auto fileName = m_foundFiles->index(i, FoundFilesModel::C_Filename).data().toString();
-			files.emplace_back(fileName.toUtf8());
-		}
+            files.emplace_back(fileName);
+        }
 	}
 	if (files.empty()) {
 		QMessageBox::warning(this, windowTitle(), tr("Необходимо выбрать файлы на вкладке Файлы"));

@@ -2,6 +2,8 @@
 #include "fileinfo.h"
 
 #include <QPromise>
+#include <queue>
+#include <thread>
 #include <unzip.h>
 #include <zip.h>
 
@@ -88,20 +90,65 @@ void findTextInZip(QPromise<FileInfo> &promise,
 	unzClose(zipfile);
 }
 
-void zipSelectedFiles(QPromise<void> &promise,
-					  const QString &zipPath,
-					  const QString &newZipPath,
-					  const std::vector<std::string> &files)
+template<typename T>
+class ThreadSafeQueue
 {
-	unzFile zipfile = unzOpen64(
-		zipPath.toUtf8()
-	);
-	if (!zipfile) {
-		promise.setException(std::make_exception_ptr("Cannot open zip file"));
-		return;
-	}
+public:
+    void push(const T &value)
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        queue_.push(value);
+        lock.unlock();
+        cond_.notify_one();
+    }
 
-	promise.setProgressRange(0, files.size());
+    void complete()
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        completed_ = true;
+        cond_.notify_all();
+    }
+
+    std::optional<T> pop()
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        cond_.wait(lock, [this] { return !queue_.empty() || completed_; });
+
+        if (queue_.empty() && completed_) {
+            return std::nullopt;
+        }
+        T value = queue_.front();
+        queue_.pop();
+        return value;
+    }
+
+    bool empty() const
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return queue_.empty();
+    }
+
+private:
+    std::queue<T> queue_;
+    bool completed_ = false;
+    mutable std::mutex mutex_;
+    std::condition_variable cond_;
+};
+
+void zipSelectedFiles(QPromise<void> &promise,
+                      const QString &zipPath,
+                      const QString &newZipPath,
+                      const QStringList &files)
+{
+    QElapsedTimer et;
+    et.start();
+    unzFile zipfile = unzOpen64(zipPath.toUtf8());
+    if (!zipfile) {
+        promise.setException(std::make_exception_ptr("Cannot open zip file"));
+        return;
+    }
+
+    promise.setProgressRange(0, files.size());
 
     zipFile zf = zipOpen64(newZipPath.toUtf8(), APPEND_STATUS_CREATE);
 
@@ -116,53 +163,67 @@ void zipSelectedFiles(QPromise<void> &promise,
 		if (promise.isCanceled())
 			return;
 
-		promise.setProgressValueAndText(++progressValue, QString::fromUtf8(fileName));
+        promise.setProgressValueAndText(++progressValue, fileName);
 
-		if (unzLocateFile(zipfile, fileName.c_str(), 1) != UNZ_OK) {
-			qWarning() << "cannot locate" << fileName.c_str();
-			continue;
-		}
+        if (unzLocateFile(zipfile, fileName.toUtf8(), 1) != UNZ_OK) {
+            qWarning() << "cannot locate" << fileName;
+            continue;
+        }
 
-		if (unzOpenCurrentFile(zipfile) != UNZ_OK) {
-			qWarning() << "cannot open" << fileName.c_str();
-			continue;
-		}
+        if (unzOpenCurrentFile(zipfile) != UNZ_OK) {
+            qWarning() << "cannot open" << fileName;
+            continue;
+        }
 
-		zip_fileinfo zi = {0};
-		if (ZIP_OK
-			!= zipOpenNewFileInZip64(zf,
-									 fileName.c_str(),
-									 &zi,
-									 nullptr,
-									 0,
-									 nullptr,
-									 0,
-									 nullptr,
-									 Z_DEFLATED,
-									 Z_DEFAULT_COMPRESSION,
-									 0)) {
-			qWarning() << "Failed to add file to zip: " << fileName.c_str();
-			continue;
-		}
+        zip_fileinfo zi = {0};
+        if (ZIP_OK
+            != zipOpenNewFileInZip64(zf,
+                                     fileName.toUtf8(),
+                                     &zi,
+                                     nullptr,
+                                     0,
+                                     nullptr,
+                                     0,
+                                     nullptr,
+                                     Z_DEFLATED,
+                                     Z_DEFAULT_COMPRESSION,
+                                     0)) {
+            qWarning() << "Failed to add file to zip: " << fileName;
+            continue;
+        }
 
-		constexpr size_t chunk_size = 1 << 20; // 1MB
-		std::vector<char> buffer(chunk_size);
-		int bytes_read;
-		while ((bytes_read = unzReadCurrentFile(zipfile, &buffer[0], chunk_size))) {
-			if (bytes_read < 0)
-				break;
+        ThreadSafeQueue<QByteArray> queue;
 
-			if (ZIP_OK != zipWriteInFileInZip(zf, buffer.data(), bytes_read)) {
-				zipCloseFileInZip(zf);
-				qWarning() << "Failed to write file chunk to zip: " << fileName.c_str();
-				break;
-			}
-		}
+        std::thread zip_reader_thread([&queue, &zipfile] {
+            constexpr qsizetype chunk_size = 1 << 20; // 1MB
+            QByteArray buffer(chunk_size, Qt::Uninitialized);
+            int bytes_read;
+            while ((bytes_read = unzReadCurrentFile(zipfile, buffer.data(), chunk_size))) {
+                if (bytes_read < 0)
+                    break;
+                queue.push(buffer.first(bytes_read));
+            }
+            queue.complete();
+        });
 
-		zipCloseFileInZip(zf);
-		unzCloseCurrentFile(zipfile);
-	}
+        std::thread zip_write_thread([&queue, zf, &fileName] {
+            while (auto value = queue.pop()) {
+                if (ZIP_OK != zipWriteInFileInZip(zf, value->data(), value->size())) {
+                    zipCloseFileInZip(zf);
+                    qWarning() << "Failed to write file chunk to zip: " << fileName;
+                    break;
+                }
+            }
+        });
 
-	zipClose(zf, nullptr);
-	unzClose(zipfile);
+        zip_reader_thread.join();
+        zip_write_thread.join();
+
+        zipCloseFileInZip(zf);
+        unzCloseCurrentFile(zipfile);
+    }
+
+    zipClose(zf, nullptr);
+    unzClose(zipfile);
+    qDebug() << et.elapsed();
 }

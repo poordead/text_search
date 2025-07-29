@@ -8,6 +8,6 @@ void findTextInZip(QPromise<FileInfo> &promise,
 				   const std::string &search_str);
 
 void zipSelectedFiles(QPromise<void> &promise,
-					  const QString &zipPath,
-					  const QString &newZipPath,
-					  const std::vector<std::string> &files);
+                      const QString &zipPath,
+                      const QString &newZipPath,
+                      const QStringList &files);
