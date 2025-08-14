@@ -76,18 +76,25 @@ void findTextInZip(QPromise<FileInfo> &promise,
 			prevBuffer.append(buffer.substr(0, bytes_read));
 
 			if (const auto foundPos{prevBuffer.find(search_str)}; foundPos != std::string::npos) {
-				promise.addResult(
-					{QString::fromUtf8(fileName), file_info.uncompressed_size, lastModified});
-				break;
-			}
+                unz64_file_pos file_pos;
+                if (unzGetFilePos64(zipfile, &file_pos) != UNZ_OK) {
+                    promise.setException(std::make_exception_ptr("Failed to get file position."));
+                    break;
+                }
+                promise.addResult({QString::fromUtf8(fileName),
+                                   file_info.uncompressed_size,
+                                   lastModified,
+                                   file_pos});
+                break;
+            }
 
-			prevBuffer = buffer.substr(buffer.size() - search_str.size());
-		}
+            prevBuffer = buffer.substr(buffer.size() - search_str.size());
+        }
 
-		unzCloseCurrentFile(zipfile);
-	} while (unzGoToNextFile(zipfile) == UNZ_OK);
+        unzCloseCurrentFile(zipfile);
+    } while (unzGoToNextFile(zipfile) == UNZ_OK);
 
-	unzClose(zipfile);
+    unzClose(zipfile);
 }
 
 template<typename T>
@@ -138,7 +145,7 @@ private:
 void zipSelectedFiles(QPromise<void> &promise,
                       const QString &zipPath,
                       const QString &newZipPath,
-                      const QStringList &files)
+                      const QList<FileInfo> &files)
 {
     QElapsedTimer et;
     et.start();
@@ -158,15 +165,16 @@ void zipSelectedFiles(QPromise<void> &promise,
     }
     int progressValue{0};
 
-	for (const auto &fileName : files) {
-		promise.suspendIfRequested();
-		if (promise.isCanceled())
-			return;
+    for (const auto &fileInfo : files) {
+        promise.suspendIfRequested();
+        if (promise.isCanceled())
+            return;
+        const auto fileName{fileInfo.fileName};
 
         promise.setProgressValueAndText(++progressValue, fileName);
 
-        if (unzLocateFile(zipfile, fileName.toUtf8(), 1) != UNZ_OK) {
-            qWarning() << "cannot locate" << fileName;
+        if (unzGoToFilePos64(zipfile, &fileInfo.filePos) != UNZ_OK) {
+            qWarning() << "cannot go to file pos" << fileName;
             continue;
         }
 
@@ -204,23 +212,21 @@ void zipSelectedFiles(QPromise<void> &promise,
                 queue.push(buffer.first(bytes_read));
             }
             queue.complete();
+            unzCloseCurrentFile(zipfile);
         });
 
         std::thread zip_write_thread([&queue, zf, &fileName] {
-            while (auto value = queue.pop()) {
+            while (const auto value = queue.pop()) {
                 if (ZIP_OK != zipWriteInFileInZip(zf, value->data(), value->size())) {
-                    zipCloseFileInZip(zf);
                     qWarning() << "Failed to write file chunk to zip: " << fileName;
                     break;
                 }
             }
+            zipCloseFileInZip(zf);
         });
 
         zip_reader_thread.join();
         zip_write_thread.join();
-
-        zipCloseFileInZip(zf);
-        unzCloseCurrentFile(zipfile);
     }
 
     zipClose(zf, nullptr);

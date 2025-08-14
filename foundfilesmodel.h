@@ -8,8 +8,8 @@
 class FoundFilesModel : public QAbstractItemModel
 {
 public:
-	enum Columns { C_Filename, C_FileSize, C_Timestamp, C_Count };
-	explicit FoundFilesModel(QObject *parent = nullptr);
+    enum Columns { C_Filename, C_FileSize, C_Timestamp, C_FilePos, C_Count };
+    explicit FoundFilesModel(QObject *parent = nullptr);
 
 	QModelIndex index(int row, int column, const QModelIndex &parent = QModelIndex()) const override;
 	int rowCount(const QModelIndex &parent = QModelIndex()) const override;

@@ -34,7 +34,9 @@ QVariant FoundFilesModel::data(const QModelIndex &index, int role) const
 			return std::get<FileInfo>(m_data.at(index.row())).fileSize;
 		case C_Timestamp:
 			return std::get<FileInfo>(m_data.at(index.row())).lastModified;
-		}
+        case C_FilePos:
+            return QVariant::fromValue(std::get<FileInfo>(m_data.at(index.row())).filePos);
+        }
 	} else if (role == Qt::CheckStateRole) {
 		switch (index.column()) {
 		case C_Filename:

@@ -10,4 +10,4 @@ void findTextInZip(QPromise<FileInfo> &promise,
 void zipSelectedFiles(QPromise<void> &promise,
                       const QString &zipPath,
                       const QString &newZipPath,
-                      const QStringList &files);
+                      const QList<FileInfo> &files);

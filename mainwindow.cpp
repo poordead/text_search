@@ -125,7 +125,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
 
 void MainWindow::saveZip()
 {
-    QStringList files;
+    QList<FileInfo> files;
 
     for (int i = 0, size = m_foundFiles->rowCount(); i < size; ++i) {
 		if (m_foundFiles->index(i, FoundFilesModel::C_Filename)
@@ -133,23 +133,26 @@ void MainWindow::saveZip()
 				.value<Qt::CheckState>()
 			== Qt::Checked) {
 			auto fileName = m_foundFiles->index(i, FoundFilesModel::C_Filename).data().toString();
-            files.emplace_back(fileName);
+            auto filePos = m_foundFiles->index(i, FoundFilesModel::C_FilePos)
+                               .data()
+                               .value<unz64_file_pos>();
+            files.emplace_back(FileInfo{fileName, 0, QDateTime{}, filePos});
         }
 	}
-	if (files.empty()) {
-		QMessageBox::warning(this, windowTitle(), tr("Необходимо выбрать файлы на вкладке Файлы"));
-		return;
-	}
+    if (files.empty()) {
+        QMessageBox::warning(this, windowTitle(), tr("Необходимо выбрать файлы на вкладке Файлы"));
+        return;
+    }
 
-	const QString fileName{QFileDialog::getSaveFileName(this,
-														tr("Сохранить выбранные файлы в архив"),
-														QStandardPaths::writableLocation(
-															QStandardPaths::DocumentsLocation),
-														tr("Архив (*.zip)"))};
-	if (fileName.isEmpty())
+    const QString fileName{QFileDialog::getSaveFileName(this,
+                                                        tr("Сохранить выбранные файлы в архив"),
+                                                        QStandardPaths::writableLocation(
+                                                            QStandardPaths::DocumentsLocation),
+                                                        tr("Архив (*.zip)"))};
+    if (fileName.isEmpty())
 		return;
 
-	m_saveWatcher.setFuture(QtConcurrent::run(zipSelectedFiles, m_fileName, fileName, files));
+    m_saveWatcher.setFuture(QtConcurrent::run(zipSelectedFiles, m_fileName, fileName, files));
 }
 
 void MainWindow::selectAll(bool checked)
